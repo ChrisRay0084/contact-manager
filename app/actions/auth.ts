@@ -1,87 +1,74 @@
 "use server";
 
-import axios from "axios";
 import { redirect } from "next/navigation";
 import { UserType } from "../_types/user";
 import { deleteSession, setSession } from "../_lib/session";
 import { nanoid } from "nanoid";  
 
-// const API_URL = "http://localhost:3001";
-const API_URL = "/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
-
-export const registerAction = async (
-  prevState: any,
-  formData: FormData
-) => {
-  const name = formData.get("name");
-  const email = formData.get("email");
-  const password = formData.get("password");
+export const registerAction = async (prevState: any, formData: FormData) => {
+  const name = String(formData.get("name") ?? "");
+  const email = String(formData.get("email") ?? "");
+  const password = String(formData.get("password") ?? "");
 
   // 1️⃣ Check if email already exists
-  const existingUser = await axios.get(`${API_URL}/users`, {
-    params: { email }
-  });
+  const existingRes = await fetch(`${API_URL}/api/users?email=${encodeURIComponent(email)}`);
+  const existingData = await existingRes.json();
 
-  if (existingUser.data.length > 0) {
+  if (existingData.length > 0) {
     return { error: "Email already registered" };
   }
 
   // 2️⃣ Create new user
-  const newUser = {
+  const newUser: UserType = {
     id: `C_${nanoid()}`,
     name,
     email,
-    password // ⚠️ Not secure yet
+    password
   };
 
-  await axios.post(`${API_URL}/users`, newUser);
+  await fetch(`${API_URL}/api/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(newUser),
+  });
 
   return { success: true };
 };
 
-
 export const loginAction = async (formData: FormData) => {
-    console.log("Form data received on the server:", formData);
+  console.log("Form data received on the server:", formData);
 
-    let user: UserType | null = null;
+  try {
+    const email = String(formData.get("email") ?? "");
+    const password = String(formData.get("password") ?? "");
+    const url = `${API_URL}/api/users?email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
 
-    try {
-        const email = String(formData.get("email") ?? "");
-        const password = String(formData.get("password") ?? "");
-        const url = `${API_URL}/users`;
+    console.log("Request:", url);
 
-        console.log("Request:", url, { email, password });
-        console.log(`Attempting login with email: ${email}`);
+    const res = await fetch(url);
+    const data: UserType[] = await res.json();
 
-        const response = await axios.get(url, {
-            params: { email, password }
-        });
+    const user = data[0];
 
-        console.log("API Response:", response.status, response.data);
-
-        user = response.data[0];
-
-        if (!user) {
-            throw new Error("Invalid credentials - user not found");
-        }
-
-        // You could set cookies here if needed
-        await setSession({name: user.name, email: user.email, id: user.id});
-    } catch (error) {
-        console.error("Login error:", error);
-        throw new Error(
-            `Login failed: ${
-                error instanceof Error ? error.message : "Unknown error"
-            }`
-        );
+    if (!user) {
+      throw new Error("Invalid credentials - user not found");
     }
 
-    // ✅ Redirect OUTSIDE the try/catch
-    redirect("/contact");
+    // ✅ Set session
+    await setSession({ name: user.name, email: user.email, id: user.id });
+  } catch (error) {
+    console.error("Login error:", error);
+    throw new Error(
+      `Login failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+
+  redirect("/contact");
 };
 
 export const logoutAction = async () => {
-    await deleteSession();
-    redirect("/login");
+  await deleteSession();
+  redirect("/login");
 };

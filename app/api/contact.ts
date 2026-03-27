@@ -1,48 +1,49 @@
-import axios from "axios";
 import { ContactType } from "../_types/contacts";
 
-// const API_URL = "http://localhost:3001";
-const API_URL = "/api";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
-//export const getContacts = async (userId: number) => {
+// GET all contacts for a user
 export const getContacts = async (userId: string) => {
-    const response = await axios.get(`${API_URL}/contacts?userId=${userId}`);
-    return response.data;
+  const res = await fetch(`${API_URL}/api/contacts?userId=${encodeURIComponent(userId)}`);
+  if (!res.ok) throw new Error("Failed to fetch contacts");
+  return res.json();
 };
 
-/*
+// GET a single contact by ID
 export const getContactById = async (id: string) => {
-    //console.log("Fetching contact with id:", id);
-    //console.log("API fetching id:", id);
-
-    const response = await axios.get(`${API_URL}/contacts/${id}`);
-    return response.data;
-};
-*/
-
-export const getContactById = async (id: string) => {
-  const response = await axios.get(`${API_URL}/contacts`, {
-    params: { id: String(id) } // ?id=0d63
-    
-  });
-  console.log("API fetching id:", id);
-
-  // json-server returns an array, pick first match
-  return response.data[0] || null;
+  const res = await fetch(`${API_URL}/api/contacts?id=${id}`);
+  if (!res.ok) throw new Error("Failed to fetch contact");
+  const data = await res.json();
+  return data[0] || null;
 };
 
+// CREATE a new contact
 export const createContact = async (contact: ContactType) => {
-    const response = await axios.post(`${API_URL}/contacts`, contact);
-    return response.data;
+  const res = await fetch(`${API_URL}/api/contacts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(contact),
+  });
+  if (!res.ok) throw new Error("Failed to create contact");
+  return res.json();
 };
 
+// UPDATE a contact
 export const updateContact = async (id: string, contact: ContactType) => {
-    const response = await axios.put(`${API_URL}/contacts/${id}`, contact);
-    return response.data;
+  const res = await fetch(`${API_URL}/api/contacts/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(contact),
+  });
+  if (!res.ok) throw new Error("Failed to update contact");
+  return res.json();
 };
 
+// DELETE a contact
 export const deleteContact = async (id: string) => {
-    console.log("Deleting contact id:", id);
-    const response = await axios.delete(`${API_URL}/contacts/${id}`);
-    return response.data;
+  const res = await fetch(`${API_URL}/api/contacts/${id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete contact");
+  return res.json();
 };
