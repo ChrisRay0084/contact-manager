@@ -1,7 +1,8 @@
 import axios from "axios";
 import { ContactType } from "../_types/contacts";
 
-const API_URL = "http://localhost:3001";
+// const API_URL = "http://localhost:3001";
+const API_URL = "/api";
 
 //export const getContacts = async (userId: number) => {
 export const getContacts = async (userId: string) => {

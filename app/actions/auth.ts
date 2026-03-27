@@ -6,7 +6,9 @@ import { UserType } from "../_types/user";
 import { deleteSession, setSession } from "../_lib/session";
 import { nanoid } from "nanoid";  
 
-const API_URL = "http://localhost:3001";
+// const API_URL = "http://localhost:3001";
+const API_URL = "/api";
+
 
 export const registerAction = async (
   prevState: any,
