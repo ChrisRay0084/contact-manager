@@ -5,7 +5,7 @@ import { UserType } from "../_types/user";
 import { deleteSession, setSession } from "../_lib/session";
 import { nanoid } from "nanoid";  
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+const API_URL = `${process.env.NEXT_PUBLIC_BASE_URL}/api`;
 
 export const registerAction = async (prevState: any, formData: FormData) => {
   const name = String(formData.get("name") ?? "");
