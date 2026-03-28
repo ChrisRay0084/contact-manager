@@ -49,7 +49,7 @@ export const createContactAction = async (
     id: `C_${nanoid(6)}`,   // ← prefix added here to make this a string ID
     name: formData.get("name") as string,
     email: formData.get("email") as string,
-    userId: Number(user.id) // Ensure userId is a number
+    userId: user.id 
   };
 
   try {
@@ -100,7 +100,7 @@ export const updateContactAction = async (
     //id: `C_${nanoid(6)}`,   // ← prefix added here to make this a string ID
     name: formData.get("name") as string,
     email: formData.get("email") as string,
-    userId: Number(user.id) // Ensure userId is a number
+    userId: user.id
   };
 
   try {
