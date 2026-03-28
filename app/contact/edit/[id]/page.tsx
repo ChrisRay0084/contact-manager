@@ -112,19 +112,40 @@ export default async function EditContactPage({ params }: PageProps) {
 
 export default EditContactPage;*/
 
+// app/contact/page.tsx (EditContactPage)
 import ContactForm from '@/app/_components/ContactForm';
 import { updateContactAction } from '@/app/actions/contact';
-import { getContactById } from '@/app/api/contact';
+import { getSession } from '@/app/_lib/session';
+import { ContactType } from '@/app/_types/contacts';
+import fs from 'fs';
+import path from 'path';
+
+const DB_PATH = path.join(process.cwd(), 'app/_data/db.json');
+
+function readDB() {
+  const jsonData = fs.readFileSync(DB_PATH, 'utf-8');
+  return JSON.parse(jsonData);
+}
+
+const getContactByIdServer = async (id: string): Promise<ContactType | null> => {
+  const user = await getSession();
+  if (!user) return null;
+
+  const db = readDB();
+  const contact = db.contacts.find(
+    (c: ContactType) => c.id === id && c.userId === user.id
+  );
+  return contact || null;
+};
 
 const EditContactPage = async ({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) => {
+  const { id } = params;
 
-  const { id } = await params; // ✅ unwrap promise properly
-
-  const contact = await getContactById(String(id)); // ✅ keep it as string
+  const contact = await getContactByIdServer(id);
 
   console.log("Contact to edit:", contact);
 

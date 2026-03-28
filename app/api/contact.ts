@@ -1,100 +1,104 @@
+'use server';
+import { revalidatePath } from "next/cache";
+import { getSession } from "../_lib/session";
 import { ContactType } from "../_types/contacts";
+import { nanoid } from "nanoid";
+import fs from "fs";
+import path from "path";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const DB_PATH = path.join(process.cwd(), "app/_data/db.json");
 
-// GET all contacts for a user
-export const getContacts = async (userId: string | number) => {
-  const url = `${API_URL}/contacts?userId=${encodeURIComponent(String(userId))}`;
+function readDB() {
+  const jsonData = fs.readFileSync(DB_PATH, "utf-8");
+  return JSON.parse(jsonData);
+}
 
-  console.log("GET contacts - URL:", url);
-  console.log("userId type:", typeof userId);
+function writeDB(db: any) {
+  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
+}
 
-  const res = await fetch(url);
+// CREATE
+export const createContactAction = async (prevState: any, formData: FormData) => {
+  if (!formData) return { error: "Form data is required" };
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Fetch error response:", text);
-    console.error("Status:", res.status);
-    throw new Error(`Failed to fetch contacts: ${res.status}`);
+  const user = await getSession();
+  if (!user) return { error: "User session not found" };
+
+  const newContact: ContactType = {
+    id: `C_${nanoid(6)}`,
+    name: formData.get("name") as string,
+    email: formData.get("email") as string,
+    userId: user.id
+  };
+
+  try {
+    const db = readDB();
+    db.contacts.push(newContact);
+    writeDB(db);
+    revalidatePath("/contact");
+    return { success: true };
+  } catch (error) {
+    console.error("Error creating contact:", error);
+    return { error: "Failed to create contact. Please try again." };
   }
-
-  return res.json();
 };
 
-// GET a single contact by ID
-export const getContactById = async (id: string) => {
-  const url = `${API_URL}/contacts?id=${encodeURIComponent(id)}`;
-  console.log("GET contact by ID - URL:", url);
+// UPDATE
+export const updateContactAction = async (prevState: any, formData: FormData) => {
+  if (!formData) return { error: "Form data is required" };
 
-  const res = await fetch(url);
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Fetch error response:", text);
-    console.error("Status:", res.status);
-    throw new Error(`Failed to fetch contact: ${res.status}`);
+  const id = formData.get("id") as string;
+  const user = await getSession();
+  if (!user) return { error: "User session not found" };
+
+  const updatedContact: ContactType = {
+    name: formData.get("name") as string,
+    email: formData.get("email") as string,
+    userId: user.id
+  };
+
+  try {
+    const db = readDB();
+    const index = db.contacts.findIndex((c: ContactType) => c.id === id);
+    if (index === -1) return { error: "Contact not found" };
+
+    db.contacts[index] = { ...db.contacts[index], ...updatedContact };
+    writeDB(db);
+    revalidatePath("/contact");
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating contact:", error);
+    return { error: "Failed to update contact. Please try again." };
   }
-
-  const data = await res.json();
-  return data[0] || null;
 };
 
-// CREATE a new contact
-export const createContact = async (contact: ContactType) => {
-  const url = `${API_URL}/contacts`;
-  console.log("CREATE contact - URL:", url);
-  console.log("Contact data:", contact);
+// DELETE
+export const deleteContactAction = async (prevState: any, formData: FormData) => {
+  const id = formData.get("id") as string;
+  if (!id) return { error: "No ID provided" };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(contact),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Fetch error response:", text);
-    console.error("Status:", res.status);
-    throw new Error(`Failed to create contact: ${res.status}`);
+  try {
+    const db = readDB();
+    db.contacts = db.contacts.filter((c: ContactType) => c.id !== id);
+    writeDB(db);
+    revalidatePath("/contact");
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting contact:", error);
+    return { error: "Failed to delete contact." };
   }
-
-  return res.json();
 };
 
-// UPDATE a contact
-export const updateContact = async (id: string, contact: ContactType) => {
-  const url = `${API_URL}/contacts/${id}`;
-  console.log("UPDATE contact - URL:", url);
-  console.log("Contact data:", contact);
+// GET contacts
+export const getContactsAction = async (): Promise<ContactType[]> => {
+  const user = await getSession();
+  if (!user) return [];
 
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(contact),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Fetch error response:", text);
-    console.error("Status:", res.status);
-    throw new Error(`Failed to update contact: ${res.status}`);
+  try {
+    const db = readDB();
+    return db.contacts.filter((c: ContactType) => c.userId === user.id);
+  } catch (error) {
+    console.error("Error reading contacts:", error);
+    return [];
   }
-
-  return res.json();
-};
-
-// DELETE a contact
-export const deleteContact = async (id: string) => {
-  const url = `${API_URL}/contacts/${id}`;
-  console.log("DELETE contact - URL:", url);
-
-  const res = await fetch(url, { method: "DELETE" });
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error("Fetch error response:", text);
-    console.error("Status:", res.status);
-    throw new Error(`Failed to delete contact: ${res.status}`);
-  }
-
-  return res.json();
 };

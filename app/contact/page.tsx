@@ -1,14 +1,11 @@
-// app/contact/page.tsx
-import React from "react";
-import { getSession } from "../_lib/session";
-import { getContacts } from "../api/contact";
-import ContactList from "../_components/ContactList";
+import React from 'react';
+import ContactList from '../_components/ContactList';
+import { getContactsAction } from '../api/contact';
+import { getSession } from '../_lib/session';
 
 const ContactPage = async () => {
-  // Get the current user from the session
   const user = await getSession();
 
-  // If no user, prompt to log in
   if (!user) {
     return (
       <div>
@@ -21,14 +18,9 @@ const ContactPage = async () => {
     );
   }
 
-  // Ensure user.id is a string
-  const userId = String(user.id);
+  const contacts = await getContactsAction();
+  console.log("Contacts:", contacts);
 
-  // Fetch contacts for this user
-  const contacts = await getContacts(userId);
-  console.log("Contacts for userId", userId, ":", contacts);
-
-  // If no contacts, prompt to add a new one
   if (!contacts || contacts.length === 0) {
     return (
       <div>
@@ -41,7 +33,6 @@ const ContactPage = async () => {
     );
   }
 
-  // Render contacts list
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
