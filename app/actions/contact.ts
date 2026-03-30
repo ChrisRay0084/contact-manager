@@ -28,6 +28,13 @@ async function getDB() {
 async function updateDB(db: any, sha: string) {
   const content = Buffer.from(JSON.stringify(db, null, 2)).toString("base64");
 
+  // Debug logging
+  console.log("Updating GitHub DB...");
+  console.log("Token present?", process.env.GITHUB_TOKEN ? "✅ yes" : "❌ no");
+  console.log("Owner:", process.env.GITHUB_OWNER);
+  console.log("Repo:", process.env.GITHUB_REPO);
+  console.log("File Path:", process.env.GITHUB_FILE_PATH);
+
   const res = await fetch(
     `${BASE_URL}/repos/${process.env.GITHUB_OWNER}/${process.env.GITHUB_REPO}/contents/${process.env.GITHUB_FILE_PATH}`,
     {
@@ -45,10 +52,12 @@ async function updateDB(db: any, sha: string) {
   );
 
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(err);
+    const errText = await res.text();
+    console.error("GitHub API error:", res.status, errText);
+    throw new Error(`GitHub update failed: ${res.status}`);
   }
 
+  console.log("GitHub update successful!");
   return res.json();
 }
 
