@@ -60,7 +60,7 @@ export const updateContactAction = async (prevState: any, formData: FormData) =>
   try {
     const db = readDB();
     const index = db.contacts.findIndex((c: ContactType) => c.id === id);
-    if (index === -1) return { error: "Contact not found" };
+    if (index === -1) return { error: "Contact not found d" };
 
     db.contacts[index] = { ...db.contacts[index], ...updatedContact };
     writeDB(db);
