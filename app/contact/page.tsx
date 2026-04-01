@@ -1,6 +1,6 @@
 import React from 'react';
 import ContactList from '../_components/ContactList';
-import { getContactsAction } from '../api/contact';
+import { getContacts } from '../actions/contact'; // ✅ FIXED
 import { getSession } from '../_lib/session';
 
 const ContactPage = async () => {
@@ -18,7 +18,7 @@ const ContactPage = async () => {
     );
   }
 
-  const contacts = await getContactsAction();
+  const contacts = await getContacts(); // ✅ FIXED
   console.log("Contacts:", contacts);
 
   if (!contacts || contacts.length === 0) {
