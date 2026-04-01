@@ -11,7 +11,8 @@ type DeleteButtonProps = {
 const DeleteButton = ({ contact }: DeleteButtonProps) => {
   return (
     <form
-      action={deleteContactAction}
+      action={deleteContactAction as unknown as string} // hack for TypeScript
+      method="post"
       onSubmit={(e) => {
         if (!confirm('Are you sure you want to delete this contact?')) {
           e.preventDefault();
