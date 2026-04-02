@@ -14,10 +14,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
-        <div className="min-h-screen bg-gray-50">
+      <body className="relative min-h-screen bg-gray-50">
+        {/* Full-page background image */}
+        <div
+          className="fixed inset-0 bg-cover bg-center opacity-60 -z-10"
+          style={{ backgroundImage: "url('/cm_bg.png')" }}
+        ></div>
+
+        <div className="min-h-screen flex flex-col">
           <Navbar />
-          <main className="container mx-auto px-4 py-8">
+          <main className="container mx-auto px-4 py-8 flex-1">
             {children}
           </main>
         </div>
