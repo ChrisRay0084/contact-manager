@@ -4,34 +4,36 @@ import fs from "fs";
 import path from "path";
 import { ContactType } from "../../_types/contacts";
 
-// DB path: local or production (Vercel /tmp)
-
+// ---------------- DB PATH ---------------- //
+// Use /tmp on Vercel (writable), local path otherwise
 const DB_PATH =
   process.env.VERCEL === "1"
     ? "/tmp/db.json"
     : path.join(process.cwd(), "app/_data/db.json");
 
-// Simple unique ID generator
-function generateContactId() {
+// ---------------- HELPERS ---------------- //
+
+// Unique ID generator
+function generateContactId(): string {
   return `C_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// Read database safely
-function readDB() {
+// Read DB with type safety
+function readDB(): { contacts: ContactType[] } {
   try {
     if (!fs.existsSync(DB_PATH)) {
       fs.writeFileSync(DB_PATH, JSON.stringify({ contacts: [] }, null, 2));
     }
     const jsonData = fs.readFileSync(DB_PATH, "utf-8");
-    return JSON.parse(jsonData);
+    return JSON.parse(jsonData) as { contacts: ContactType[] };
   } catch (error) {
     console.error("readDB error:", error);
     return { contacts: [] };
   }
 }
 
-// Write database safely
-function writeDB(db: any) {
+// Write DB
+function writeDB(db: { contacts: ContactType[] }) {
   try {
     fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
   } catch (error) {
@@ -39,17 +41,20 @@ function writeDB(db: any) {
   }
 }
 
-// --------------------- CRUD ---------------------
+// ---------------- CRUD HANDLERS ---------------- //
 
 // GET all contacts for a user
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const userId = url.searchParams.get("userId");
-    if (!userId) return NextResponse.json({ error: "userId is required" }, { status: 400 });
+    if (!userId)
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
 
     const db = readDB();
-    const contacts: ContactType[] = db.contacts.filter(c => String(c.userId) === String(userId));
+    const contacts = db.contacts.filter(
+      (c: ContactType) => String(c.userId) === String(userId)
+    );
 
     return NextResponse.json(contacts);
   } catch (error) {
@@ -62,6 +67,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const newContact: ContactType = await req.json();
+
     if (!newContact.name || !newContact.email || !newContact.userId) {
       return NextResponse.json(
         { error: "name, email, and userId are required" },
@@ -86,16 +92,21 @@ export async function POST(req: NextRequest) {
 // UPDATE a contact
 export async function PATCH(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { id, name, email } = body;
+    const { id, name, email } = await req.json();
 
     if (!id || !name || !email) {
-      return NextResponse.json({ error: "id, name, and email are required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "id, name, and email are required" },
+        { status: 400 }
+      );
     }
 
     const db = readDB();
-    const index = db.contacts.findIndex(c => String(c.id) === String(id));
-    if (index === -1) return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    const index = db.contacts.findIndex((c: ContactType) => String(c.id) === String(id));
+
+    if (index === -1) {
+      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    }
 
     db.contacts[index] = { ...db.contacts[index], name, email };
     writeDB(db);
@@ -111,10 +122,13 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const { id } = await req.json();
-    if (!id) return NextResponse.json({ error: "Contact id is required" }, { status: 400 });
+
+    if (!id) {
+      return NextResponse.json({ error: "Contact id is required" }, { status: 400 });
+    }
 
     const db = readDB();
-    db.contacts = db.contacts.filter(c => String(c.id) !== String(id));
+    db.contacts = db.contacts.filter((c: ContactType) => String(c.id) !== String(id));
     writeDB(db);
 
     return NextResponse.json({ ok: true });
