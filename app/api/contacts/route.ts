@@ -4,7 +4,10 @@ import fs from "fs";
 import path from "path";
 import { ContactType } from "../../_types/contacts";
 
-const DB_PATH = path.join(process.cwd(), "app/_data/db.json");
+const DB_PATH =
+  process.env.NODE_ENV === "production"
+    ? "/tmp/db.json"
+    : path.join(process.cwd(), "app/_data/db.json");
 
 // Simple unique ID generator for contacts
 function generateContactId() {
@@ -12,8 +15,18 @@ function generateContactId() {
 }
 
 function readDB() {
-  const jsonData = fs.readFileSync(DB_PATH, "utf-8");
-  return JSON.parse(jsonData);
+  try {
+    // Create file if it doesn't exist (important for /tmp on Vercel)
+    if (!fs.existsSync(DB_PATH)) {
+      fs.writeFileSync(DB_PATH, JSON.stringify({ contacts: [] }, null, 2));
+    }
+
+    const jsonData = fs.readFileSync(DB_PATH, "utf-8");
+    return JSON.parse(jsonData);
+  } catch (error) {
+    console.error("readDB error:", error);
+    return { contacts: [] };
+  }
 }
 
 function writeDB(db: any) {
@@ -70,30 +83,23 @@ export async function POST(req: NextRequest) {
 }
 
 // DELETE a contact
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req: Request) {
   try {
-    const body = await req.json();
-    console.log("DELETE BODY:", body);
-
-    const { id } = body;
+    const { id } = await req.json();
 
     if (!id) {
-      console.log("NO ID PROVIDED");
-      return NextResponse.json({ error: "Contact id is required" }, { status: 400 });
+      return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
     const db = readDB();
-    console.log("BEFORE DELETE:", db.contacts.length);
 
     db.contacts = db.contacts.filter(
       (c: ContactType) => String(c.id) !== String(id)
     );
 
-    console.log("AFTER DELETE:", db.contacts.length);
-
     writeDB(db);
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE contact error:", error);
     return NextResponse.json({ error: "Failed to delete contact" }, { status: 500 });
