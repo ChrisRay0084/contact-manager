@@ -7,7 +7,10 @@ import fs from "fs";
 import path from "path";
 import { ContactType } from "../_types/contacts";
 
-const DB_PATH = path.join(process.cwd(), "app/_data/db.json");
+const DB_PATH =
+  process.env.NODE_ENV === "production"
+    ? "/tmp/db.json"
+    : path.join(process.cwd(), "app/_data/db.json");
 
 function readDB() {
   return JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
