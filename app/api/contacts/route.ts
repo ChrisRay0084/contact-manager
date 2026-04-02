@@ -6,10 +6,21 @@ import { ContactType } from "../../_types/contacts";
 
 // ---------------- DB PATH ---------------- //
 // Use /tmp on Vercel (writable), local path otherwise
-const DB_PATH =
-  process.env.VERCEL === "1"
-    ? "/tmp/db.json"
-    : path.join(process.cwd(), "app/_data/db.json");
+const LOCAL_DB_PATH = path.join(process.cwd(), "app/_data/db.json");
+const TMP_DB_PATH = "/tmp/db.json";
+const DB_PATH = process.env.VERCEL === "1" ? TMP_DB_PATH : LOCAL_DB_PATH;
+
+function getWritableDBPath() {
+  try {
+    const candidate = DB_PATH;
+    const dir = path.dirname(candidate);
+    fs.accessSync(dir, fs.constants.W_OK);
+    return candidate;
+  } catch {
+    // Fallback to /tmp for environment with read-only project dir
+    return TMP_DB_PATH;
+  }
+}
 
 // ---------------- HELPERS ---------------- //
 
@@ -21,10 +32,11 @@ function generateContactId(): string {
 // Read DB with type safety
 function readDB(): { contacts: ContactType[] } {
   try {
-    if (!fs.existsSync(DB_PATH)) {
-      fs.writeFileSync(DB_PATH, JSON.stringify({ contacts: [] }, null, 2));
+    const dbPath = getWritableDBPath();
+    if (!fs.existsSync(dbPath)) {
+      fs.writeFileSync(dbPath, JSON.stringify({ contacts: [] }, null, 2), "utf-8");
     }
-    const jsonData = fs.readFileSync(DB_PATH, "utf-8");
+    const jsonData = fs.readFileSync(dbPath, "utf-8");
     return JSON.parse(jsonData) as { contacts: ContactType[] };
   } catch (error) {
     console.error("readDB error:", error);
@@ -35,7 +47,8 @@ function readDB(): { contacts: ContactType[] } {
 // Write DB
 function writeDB(db: { contacts: ContactType[] }) {
   try {
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
+    const dbPath = getWritableDBPath();
+    fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), "utf-8");
   } catch (error) {
     console.error("writeDB error:", error);
   }
