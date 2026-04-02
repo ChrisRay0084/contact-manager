@@ -4,47 +4,42 @@ import fs from "fs";
 import path from "path";
 import { ContactType } from "../../_types/contacts";
 
-// Use /tmp in production, local file during development
-const DB_PATH =
-  process.env.NODE_ENV === "production"
+/** Compute DB path dynamically to avoid read-only errors on Vercel */
+function getDBPath() {
+  return process.env.NODE_ENV === "production"
     ? "/tmp/db.json"
     : path.join(process.cwd(), "app/_data/db.json");
+}
 
-// Simple unique ID generator
+/** Generate a simple unique contact ID */
 function generateContactId() {
   return `C_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// Read DB safely
+/** Read DB safely, create file if missing */
 function readDB() {
-  try {
-    // Initialize file if it doesn't exist
-    if (!fs.existsSync(DB_PATH)) {
-      fs.writeFileSync(DB_PATH, JSON.stringify({ contacts: [] }, null, 2));
-    }
+  const DB_PATH = getDBPath();
 
-    const jsonData = fs.readFileSync(DB_PATH, "utf-8");
-    return JSON.parse(jsonData);
-  } catch (error) {
-    console.error("readDB error:", error);
-    return { contacts: [] };
+  if (!fs.existsSync(DB_PATH)) {
+    fs.writeFileSync(DB_PATH, JSON.stringify({ contacts: [] }, null, 2), "utf-8");
   }
+
+  const jsonData = fs.readFileSync(DB_PATH, "utf-8");
+  return JSON.parse(jsonData);
 }
 
-// Write DB
+/** Write DB safely */
 function writeDB(db: any) {
-  try {
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
-  } catch (error) {
-    console.error("writeDB error:", error);
-  }
+  const DB_PATH = getDBPath();
+  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
 }
 
-// GET all contacts for a user
+// -------------------- GET contacts --------------------
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const userId = url.searchParams.get("userId");
+
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
@@ -61,7 +56,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// CREATE a new contact
+// -------------------- CREATE contact --------------------
 export async function POST(req: NextRequest) {
   try {
     const newContact: ContactType = await req.json();
@@ -88,30 +83,22 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE a contact
+// -------------------- DELETE contact --------------------
 export async function DELETE(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { id } = body;
+    const { id } = await req.json();
 
     if (!id) {
-      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+      return NextResponse.json({ error: "Contact id is required" }, { status: 400 });
     }
 
     const db = readDB();
-    const initialCount = db.contacts.length;
 
-    db.contacts = db.contacts.filter(
-      (c: ContactType) => String(c.id) !== String(id)
-    );
-
-    if (db.contacts.length === initialCount) {
-      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
-    }
+    db.contacts = db.contacts.filter((c: ContactType) => String(c.id) !== String(id));
 
     writeDB(db);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("DELETE contact error:", error);
     return NextResponse.json({ error: "Failed to delete contact" }, { status: 500 });

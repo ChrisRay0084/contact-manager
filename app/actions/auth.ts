@@ -8,10 +8,7 @@ import fs from "fs";
 import path from "path";
 
 // Path to your local db.json
-const DB_PATH =
-  process.env.NODE_ENV === "production"
-    ? "/tmp/db.json"
-    : path.join(process.cwd(), "app/_data/db.json");
+const DB_PATH = path.join(process.cwd(), "app/_data/db.json");
 
 // Read database
 function readDB() {
