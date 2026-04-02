@@ -4,19 +4,21 @@ import fs from "fs";
 import path from "path";
 import { ContactType } from "../../_types/contacts";
 
+// Use /tmp in production, local file during development
 const DB_PATH =
   process.env.NODE_ENV === "production"
     ? "/tmp/db.json"
     : path.join(process.cwd(), "app/_data/db.json");
 
-// Simple unique ID generator for contacts
+// Simple unique ID generator
 function generateContactId() {
   return `C_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Read DB safely
 function readDB() {
   try {
-    // Create file if it doesn't exist (important for /tmp on Vercel)
+    // Initialize file if it doesn't exist
     if (!fs.existsSync(DB_PATH)) {
       fs.writeFileSync(DB_PATH, JSON.stringify({ contacts: [] }, null, 2));
     }
@@ -29,8 +31,13 @@ function readDB() {
   }
 }
 
+// Write DB
 function writeDB(db: any) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
+  } catch (error) {
+    console.error("writeDB error:", error);
+  }
 }
 
 // GET all contacts for a user
@@ -38,7 +45,6 @@ export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const userId = url.searchParams.get("userId");
-
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
@@ -83,19 +89,25 @@ export async function POST(req: NextRequest) {
 }
 
 // DELETE a contact
-export async function DELETE(req: Request) {
+export async function DELETE(req: NextRequest) {
   try {
-    const { id } = await req.json();
+    const body = await req.json();
+    const { id } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Missing id" }, { status: 400 });
     }
 
     const db = readDB();
+    const initialCount = db.contacts.length;
 
     db.contacts = db.contacts.filter(
       (c: ContactType) => String(c.id) !== String(id)
     );
+
+    if (db.contacts.length === initialCount) {
+      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    }
 
     writeDB(db);
 
