@@ -1,5 +1,5 @@
 // app/api/contacts/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { ContactType } from "../../_types/contacts";
@@ -21,7 +21,7 @@ function writeDB(db: any) {
 }
 
 // GET all contacts for a user
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const userId = url.searchParams.get("userId");
@@ -43,17 +43,19 @@ export async function GET(req: Request) {
 }
 
 // CREATE a new contact
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const newContact: ContactType = await req.json();
 
     if (!newContact.name || !newContact.email || !newContact.userId) {
-      return NextResponse.json({ error: "name, email, and userId are required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "name, email, and userId are required" },
+        { status: 400 }
+      );
     }
 
     const db = readDB();
 
-    // Ensure IDs are strings and generate one if missing
     newContact.id = newContact.id ? String(newContact.id) : generateContactId();
     newContact.userId = String(newContact.userId);
 
@@ -64,5 +66,36 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("POST contact error:", error);
     return NextResponse.json({ error: "Failed to create contact" }, { status: 500 });
+  }
+}
+
+// DELETE a contact
+export async function DELETE(req: NextRequest) {
+  try {
+    const body = await req.json();
+    console.log("DELETE BODY:", body);
+
+    const { id } = body;
+
+    if (!id) {
+      console.log("NO ID PROVIDED");
+      return NextResponse.json({ error: "Contact id is required" }, { status: 400 });
+    }
+
+    const db = readDB();
+    console.log("BEFORE DELETE:", db.contacts.length);
+
+    db.contacts = db.contacts.filter(
+      (c: ContactType) => String(c.id) !== String(id)
+    );
+
+    console.log("AFTER DELETE:", db.contacts.length);
+
+    writeDB(db);
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("DELETE contact error:", error);
+    return NextResponse.json({ error: "Failed to delete contact" }, { status: 500 });
   }
 }
