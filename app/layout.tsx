@@ -17,7 +17,7 @@ export default function RootLayout({
       <body className="relative min-h-screen bg-gray-50">
         {/* Full-page background image */}
         <div
-          className="fixed inset-0 bg-cover bg-center opacity-60 -z-10"
+          className="fixed inset-0 bg-cover bg-center opacity-100 -z-10"
           style={{ backgroundImage: "url('/cm_bg.png')" }}
         ></div>
 
