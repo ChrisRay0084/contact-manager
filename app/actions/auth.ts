@@ -1,82 +1,129 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { UserType } from "../_types/user";
-import { deleteSession, setSession } from "../_lib/session";
-import { nanoid } from "nanoid";
-import fs from "fs";
-import path from "path";
+import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "../_lib/supabaseServer";
 
-// Path to your local db.json
-const DB_PATH = path.join(process.cwd(), "app/_data/db.json");
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// Read database
-function readDB() {
-  const jsonData = fs.readFileSync(DB_PATH, "utf-8");
-  return JSON.parse(jsonData);
+const supabaseAdmin =
+  serviceRoleKey && serviceRoleKey !== process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    ? createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        serviceRoleKey
+      )
+    : null;
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateEmail(email: string) {
+  return emailRegex.test(email);
 }
 
-// Write database
-function writeDB(db: any) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
-}
+export const registerAction = async (_: any, formData: FormData) => {
+  const supabase = await createServerClient();
 
-/**
- * Register a new user
- */
-export const registerAction = async (prevState: any, formData: FormData) => {
-  const name = String(formData.get("name") ?? "");
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
+  const name = String(formData.get("name") || "").trim();
+  const email = String(formData.get("email") || "").trim();
+  const password = String(formData.get("password") || "");
 
-  const db = readDB();
-
-  // Check for existing email
-  const existingUser = db.users.find((u: UserType) => u.email === email);
-  if (existingUser) return { error: "Email already registered" };
-
-  const newUser: UserType = {
-    id: `C_${nanoid()}`,
-    name,
-    email,
-    password,
-  };
-
-  db.users.push(newUser);
-  writeDB(db);
-
-  return { success: true };
-};
-
-/**
- * Login user and set session
- */
-export const loginAction = async (formData: FormData) => {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
-
-  const db = readDB();
-
-  // Find user in DB
-  const user: UserType | undefined = db.users.find(
-    (u: UserType) => u.email === email && u.password === password
-  );
-
-  if (!user) {
-    throw new Error("Invalid credentials");
+  if (!name) {
+    return { error: "Please enter your full name.", success: false };
   }
 
-  // ✅ Set session cookie
-  await setSession({ id: user.id, name: user.name, email: user.email });
+  if (!email) {
+    return { error: "Please enter your email address.", success: false };
+  }
 
-  // Redirect to contacts page
-  redirect("/contact");
+  if (!validateEmail(email)) {
+    return { error: "Please enter a valid email address.", success: false };
+  }
+
+  if (!password) {
+    return { error: "Please enter a password.", success: false };
+  }
+
+  if (password.length < 6) {
+    return { error: "Password must be at least 6 characters long.", success: false };
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        full_name: name,
+      },
+    },
+  });
+
+  if (error) {
+    return { error: error.message, success: false };
+  }
+
+  if (!data.user) {
+    return { error: "Registration failed. Please try again.", success: false };
+  }
+
+  if (!supabaseAdmin) {
+    return {
+      error:
+        "Supabase service-role key is not configured correctly. Please update the real service_role secret in .env.local (Supabase Dashboard → Settings → API). The current key is not valid for profile inserts.",
+      success: false,
+    };
+  }
+
+  const { error: profileError } = await supabaseAdmin
+    .from("users")
+    .insert([
+      {
+        id: data.user.id,
+        name,
+        email: data.user.email ?? email,
+      },
+    ]);
+
+  if (profileError) {
+    await supabaseAdmin.auth.admin.deleteUser(data.user.id);
+    return { error: profileError.message, success: false };
+  }
+
+  return { success: true, error: "" };
 };
 
-/**
- * Logout user
- */
+export const loginAction = async (_: any, formData: FormData) => {
+  const supabase = await createServerClient();
+
+  const email = String(formData.get("email") || "").trim();
+  const password = String(formData.get("password") || "");
+
+  if (!email) {
+    return { error: "Please enter your email address.", success: false };
+  }
+
+  if (!validateEmail(email)) {
+    return { error: "Please enter a valid email address.", success: false };
+  }
+
+  if (!password) {
+    return { error: "Please enter your password.", success: false };
+  }
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    return { error: error.message || "Invalid credentials", success: false };
+  }
+
+  return { success: true, error: "" };
+};
+
 export const logoutAction = async () => {
-  await deleteSession();
+  const supabase = await createServerClient();
+
+  await supabase.auth.signOut();
   redirect("/login");
 };

@@ -1,75 +1,72 @@
 "use server";
 
+import { createClient } from "../_lib/supabaseServer";
 import { redirect } from "next/navigation";
-import { getSession } from "../_lib/session";
-import { nanoid } from "nanoid";
-import fs from "fs";
-import path from "path";
-import { ContactType } from "../_types/contacts";
 
-const DB_PATH = path.join(process.cwd(), "app/_data/db.json");
+/* =========================
+   CREATE
+========================= */
+export async function createContactAction(formData: FormData) {
+  const supabase = await createClient();
 
-function readDB() {
-  return JSON.parse(fs.readFileSync(DB_PATH, "utf-8"));
-}
+  const name = String(formData.get("name") || "").trim();
+  const email = String(formData.get("email") || "").trim();
+  const subject = String(formData.get("subject") || "").trim();
+  const message = String(formData.get("message") || "").trim();
 
-function writeDB(db: any) {
-  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
-}
-/*** Get all contacts for the logged-in user */
-export const getContacts = async (): Promise<ContactType[]> => {
-  const user = await getSession();
-  if (!user) return [];
+  if (!name || !email) throw new Error("Missing name or email");
 
-  const db = readDB();
-  return db.contacts.filter((c: ContactType) => c.userId === user.id);
-};
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-/** CREATE */
-export const createContactAction = async (formData: FormData) => {
-  const user = await getSession();
   if (!user) throw new Error("Not authenticated");
 
-  const db = readDB();
-  db.contacts.push({
-    id: `C_${nanoid()}`,
-    name: formData.get("name") as string,
-    email: formData.get("email") as string,
-    userId: user.id,
+  const { error } = await supabase.from("contacts").insert({
+    name,
+    email,
+    subject: subject || null,
+    message: message || null,
+    user_id: user.id,
   });
-  writeDB(db);
 
-  redirect("/contact?created=true");
-};
+  if (error) throw new Error(error.message);
 
-/** UPDATE */
-export const updateContactAction = async (formData: FormData) => {
-  const user = await getSession();
+  redirect("/contact");
+}
+
+/* =========================
+   UPDATE (THIS WAS MISSING)
+========================= */
+export async function updateContactAction(id: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const name = String(formData.get("name") || "").trim();
+  const email = String(formData.get("email") || "").trim();
+  const subject = String(formData.get("subject") || "").trim();
+  const message = String(formData.get("message") || "").trim();
+
+  if (!id) throw new Error("Missing contact ID");
+  if (!name || !email) throw new Error("Missing name or email");
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) throw new Error("Not authenticated");
 
-  const id = formData.get("id") as string;
-  const name = formData.get("name") as string;
-  const email = formData.get("email") as string;
+  const { error } = await supabase
+    .from("contacts")
+    .update({
+      name,
+      email,
+      subject: subject || null,
+      message: message || null,
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
 
-  const db = readDB();
-  const index = db.contacts.findIndex((c: ContactType) => c.id === id && c.userId === user.id);
-  if (index === -1) throw new Error("Contact not found");
+  if (error) throw new Error(error.message);
 
-  db.contacts[index] = { ...db.contacts[index], name, email };
-  writeDB(db);
-
-  redirect("/contact?updated=true");
-};
-
-/** DELETE */
-export const deleteContactAction = async (formData: FormData) => {
-  const user = await getSession();
-  if (!user) throw new Error("Not authenticated");
-
-  const id = formData.get("id") as string; // FormData now works correctly
-  const db = readDB();
-  db.contacts = db.contacts.filter((c: ContactType) => !(c.id === id && c.userId === user.id));
-  writeDB(db);
-
-  redirect("/contact?deleted=true");
-};
+  redirect("/contact");
+}

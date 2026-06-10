@@ -10,6 +10,8 @@
     "server": "json-server --watch app/_data/db.json --port 3001"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.107.0",
     "axios": "^1.13.5",
     "nanoid": "^5.1.6",
     "next": "16.1.6",

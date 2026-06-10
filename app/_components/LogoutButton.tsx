@@ -21,7 +21,14 @@ const LogoutButton = () => {
     };
 
   return (
-    <button className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition-colors cursor-pointer" onClick={handleLogout}>Logout</button>
+    <button
+      type="button"
+      aria-label="Log out of your account"
+      className="cursor-pointer rounded bg-red-500 px-4 py-2 font-bold text-white transition-colors hover:bg-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+      onClick={handleLogout}
+    >
+      Logout
+    </button>
   )
 }
 

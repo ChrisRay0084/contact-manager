@@ -1,5 +1,6 @@
 'use client';
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ContactType } from '../_types/contacts';
 import { FiTrash } from 'react-icons/fi';
 
@@ -9,33 +10,36 @@ type DeleteButtonProps = {
 };
 
 const DeleteButton = ({ contact, onDeleted }: DeleteButtonProps) => {
+  const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this contact?')) return;
+    if (!confirm("Are you sure you want to delete this contact?")) return;
 
     setIsDeleting(true);
 
     try {
-      const res = await fetch('/api/contacts', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: contact.id }),
+      const res = await fetch(`/api/contacts/${contact.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        alert(`Failed to delete: ${data.error || 'Unknown error'}`);
-        setIsDeleting(false);
-        return;
-      }
-      window.location.reload();
+      const data = await res.json();
 
-      // Optional callback to refresh parent state
-      if (onDeleted) onDeleted();
+      if (!res.ok) {
+        throw new Error(data.error || "Delete failed");
+      }
+
+      if (onDeleted) {
+        onDeleted();
+      } else {
+        router.push('/contact');
+        router.refresh();
+      }
     } catch (err) {
-      console.error('Delete contact error:', err);
-      alert('Failed to delete contact');
+      console.error("Delete contact error:", err);
+      alert("Failed to delete contact");
+    } finally {
       setIsDeleting(false);
     }
   };
@@ -43,9 +47,10 @@ const DeleteButton = ({ contact, onDeleted }: DeleteButtonProps) => {
   return (
     <button
       type="button"
+      aria-label={`Delete contact ${contact.name}`}
       onClick={handleDelete}
       disabled={isDeleting}
-      className="flex items-center gap-2 px-3 py-1 border border-red-300 rounded-md bg-red-100 hover:border-red-400 hover:bg-red-200 transition disabled:opacity-50 disabled:cursor-not-allowed"
+      className="flex items-center gap-2 rounded-md border border-red-300 bg-red-100 px-3 py-1 transition hover:border-red-400 hover:bg-red-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
     >
       <FiTrash className="text-red-500 hover:text-red-800" />
       {isDeleting ? 'Deleting...' : 'Delete'}

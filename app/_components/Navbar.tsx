@@ -1,45 +1,63 @@
-
 import Link from "next/link";
-import React from 'react'
+import { createClient } from "../_lib/supabaseServer";
 import LogoutButton from "./LogoutButton";
-import { getSession } from "../_lib/session";
 
-const Navbar = async() => {
-    const session = await getSession(); 
+const Navbar = async () => {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  let profileName = user?.email ?? "";
+
+  if (user && !userError) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("name, email")
+      .eq("id", user.id)
+      .single();
+
+    profileName = profile?.name || profile?.email || user.email || "User";
+  }
 
   return (
-    <nav className="bg-white shadow-md">
-    <div className="container mx-auto px-4 flex justify-between items-center h-16">
-    
-        <div className="text-xl font-bold text-blue-600">
-        Contact Manager
+    <nav className="bg-white shadow-md" aria-label="Primary navigation">
+      <div className="container mx-auto grid h-16 grid-cols-[1fr_auto_1fr] items-center px-4">
+        <Link
+          href="/"
+          className="justify-self-start text-xl font-bold text-blue-600 hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+        >
+          Contact Manager
+        </Link>
+
+        <div className="justify-self-center text-sm font-medium text-gray-700 md:text-base">
+          {user ? `Welcome, ${profileName}` : ""}
         </div>
 
-        <div className="flex items-center space-x-4">
-            {session ? (
-                            <>
-                                <Link href="/contact" className="hover:text-blue-600">
-                                    Contacts
-                                </Link>
-                                <LogoutButton />
-                                
-                            </>
-                        ) : (
-                            <>
-                                <Link href="/login" className="hover:text-blue-600">
-                                    Login
-                                </Link>
-                                <Link href="/register" className="hover:text-blue-600">
-                                    Register
-                                </Link>
-                            </>
-                        )
-            }
+        <div className="flex items-center justify-self-end gap-3 text-sm md:gap-4 md:text-base">
+          {user ? (
+            <>
+              <Link href="/contact" className="rounded text-gray-700 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+                Contacts
+              </Link>
+              <LogoutButton />
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="rounded text-gray-700 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+                Login
+              </Link>
+              <Link href="/register" className="rounded text-gray-700 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
+                Register
+              </Link>
+            </>
+          )}
         </div>
+      </div>
+    </nav>
+  );
+};
 
-  </div>
-</nav>
-  )
-}
-
-export default Navbar
+export default Navbar;

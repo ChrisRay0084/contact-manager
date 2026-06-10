@@ -1,152 +1,66 @@
 // app/api/contacts/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
-import { ContactType } from "../../_types/contacts";
+import { createClient } from "@/app/_lib/supabaseServer";
 
-// ---------------- DB PATH ---------------- //
-// Use /tmp on Vercel (writable), local path otherwise
-const LOCAL_DB_PATH = path.join(process.cwd(), "app/_data/db.json");
-const TMP_DB_PATH = "/tmp/db.json";
-const DB_PATH = process.env.VERCEL === "1" ? TMP_DB_PATH : LOCAL_DB_PATH;
-
-function getWritableDBPath() {
-  try {
-    const candidate = DB_PATH;
-    const dir = path.dirname(candidate);
-    fs.accessSync(dir, fs.constants.W_OK);
-    return candidate;
-  } catch {
-    // Fallback to /tmp for environment with read-only project dir
-    return TMP_DB_PATH;
-  }
-}
-
-// ---------------- HELPERS ---------------- //
-
-// Unique ID generator
-function generateContactId(): string {
-  return `C_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-// Read DB with type safety
-function readDB(): { contacts: ContactType[] } {
-  try {
-    const dbPath = getWritableDBPath();
-    if (!fs.existsSync(dbPath)) {
-      fs.writeFileSync(dbPath, JSON.stringify({ contacts: [] }, null, 2), "utf-8");
-    }
-    const jsonData = fs.readFileSync(dbPath, "utf-8");
-    return JSON.parse(jsonData) as { contacts: ContactType[] };
-  } catch (error) {
-    console.error("readDB error:", error);
-    return { contacts: [] };
-  }
-}
-
-// Write DB
-function writeDB(db: { contacts: ContactType[] }) {
-  try {
-    const dbPath = getWritableDBPath();
-    fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), "utf-8");
-  } catch (error) {
-    console.error("writeDB error:", error);
-  }
-}
-
-// ---------------- CRUD HANDLERS ---------------- //
-
-// GET all contacts for a user
-export async function GET(req: NextRequest) {
-  try {
-    const url = new URL(req.url);
-    const userId = url.searchParams.get("userId");
-    if (!userId)
-      return NextResponse.json({ error: "userId is required" }, { status: 400 });
-
-    const db = readDB();
-    const contacts = db.contacts.filter(
-      (c: ContactType) => String(c.userId) === String(userId)
-    );
-
-    return NextResponse.json(contacts);
-  } catch (error) {
-    console.error("GET contacts error:", error);
-    return NextResponse.json({ error: "Failed to fetch contacts" }, { status: 500 });
-  }
-}
-
-// CREATE a new contact
 export async function POST(req: NextRequest) {
   try {
-    const newContact: ContactType = await req.json();
+    const supabase = await createClient();
 
-    if (!newContact.name || !newContact.email || !newContact.userId) {
+    const body = await req.json();
+    const { name, email, subject, message } = body;
+
+    // ✅ Validate input
+    if (!name || !email) {
       return NextResponse.json(
-        { error: "name, email, and userId are required" },
+        { error: "Name and email are required" },
         { status: 400 }
       );
     }
 
-    const db = readDB();
-    newContact.id = newContact.id ? String(newContact.id) : generateContactId();
-    newContact.userId = String(newContact.userId);
+    // ✅ Get logged-in user
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    db.contacts.push(newContact);
-    writeDB(db);
-
-    return NextResponse.json(newContact, { status: 201 });
-  } catch (error) {
-    console.error("POST contact error:", error);
-    return NextResponse.json({ error: "Failed to create contact" }, { status: 500 });
-  }
-}
-
-// UPDATE a contact
-export async function PATCH(req: NextRequest) {
-  try {
-    const { id, name, email } = await req.json();
-
-    if (!id || !name || !email) {
+    if (userError || !user) {
+      console.error("AUTH ERROR:", userError?.message);
       return NextResponse.json(
-        { error: "id, name, and email are required" },
+        { error: "Not authenticated" },
+        { status: 401 }
+      );
+    }
+
+    // ✅ Insert contact WITH user_id (CRITICAL)
+    const { data, error } = await supabase
+      .from("contacts")
+      .insert([
+        {
+          name,
+          email,
+          subject: subject ?? null,
+          message: message ?? null,
+          user_id: user.id,
+        },
+      ])
+      .select();
+
+    if (error) {
+      console.error("INSERT ERROR:", error.message);
+      return NextResponse.json(
+        { error: error.message },
         { status: 400 }
       );
     }
 
-    const db = readDB();
-    const index = db.contacts.findIndex((c: ContactType) => String(c.id) === String(id));
-
-    if (index === -1) {
-      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
-    }
-
-    db.contacts[index] = { ...db.contacts[index], name, email };
-    writeDB(db);
-
-    return NextResponse.json(db.contacts[index]);
+    return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("PATCH contact error:", error);
-    return NextResponse.json({ error: "Failed to update contact" }, { status: 500 });
-  }
-}
+    console.error("ROUTE ERROR:", error);
 
-// DELETE a contact
-export async function DELETE(req: NextRequest) {
-  try {
-    const { id } = await req.json();
-
-    if (!id) {
-      return NextResponse.json({ error: "Contact id is required" }, { status: 400 });
-    }
-
-    const db = readDB();
-    db.contacts = db.contacts.filter((c: ContactType) => String(c.id) !== String(id));
-    writeDB(db);
-
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("DELETE contact error:", error);
-    return NextResponse.json({ error: "Failed to delete contact" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to save contact" },
+      { status: 500 }
+    );
   }
 }
