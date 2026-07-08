@@ -64,7 +64,7 @@ const ContactForm = ({ action, contact }: ContactFormProps) => {
       </div>
 
       <div>
-        <label htmlFor="contact-subject" className="block text-sm font-medium text-gray-700">Subject</label>
+        <label htmlFor="contact-subject" className="block text-sm font-medium text-gray-700">Relationship</label>
         <input
           id="contact-subject"
           name="subject"
